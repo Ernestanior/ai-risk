@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "env": {
+    "DEEPSEEK_API_KEY": "@deepseek_api_key",
+    "DEEPSEEK_BASE_URL": "https://api.deepseek.com/v1/chat/completions",
+    "DEEPSEEK_MODEL": "deepseek-chat",
+    "MAX_INPUT_CHARS": "90000",
+    "VISION_BASE_URL": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    "VISION_MODEL": "glm-4v-flash"
+  }
+}
