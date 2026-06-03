@@ -12,7 +12,7 @@ export async function POST(req) {
 
     const base = process.env.VISION_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     const key = process.env.VISION_API_KEY;
-    const model = process.env.VISION_MODEL || 'glm-4v';
+    const model = process.env.VISION_MODEL || 'glm-4v-plus';
     
     if (!key) return NextResponse.json({ error: '未配置 VISION_API_KEY（视觉模型 key）' }, { status: 500 });
 
