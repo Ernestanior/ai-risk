@@ -18,8 +18,14 @@ export default function Home() {
 
   function addFiles(fl) {
     const next = [...files];
-    for (const f of fl)
-      if (f.name.toLowerCase().endsWith('.pdf') && !next.find(x => x.name === f.name)) next.push(f);
+    const allowedExts = ['.pdf', '.docx', '.doc', '.xlsx', '.xls'];
+    for (const f of fl) {
+      const fname = f.name.toLowerCase();
+      const isAllowed = allowedExts.some(ext => fname.endsWith(ext));
+      if (isAllowed && !next.find(x => x.name === f.name)) {
+        next.push(f);
+      }
+    }
     setFiles(next);
   }
 
@@ -42,7 +48,34 @@ export default function Home() {
     return j.text || '';
   }
 
-  async function extract(f, onProgress) {
+  // 处理 Word 文件（.docx）
+  async function extractWord(file) {
+    const buf = await file.arrayBuffer();
+    const r = await fetch('/api/extract-word', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || 'Word 提取失败');
+    return j.text || '';
+  }
+
+  // 处理 Excel 文件（.xlsx, .xls）
+  async function extractExcel(file) {
+    const buf = await file.arrayBuffer();
+    const r = await fetch('/api/extract-excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf,
+    });
+    const j = await r.json();
+    if (!r.ok || j.error) throw new Error(j.error || 'Excel 提取失败');
+    return j.text || '';
+  }
+
+  // PDF 提取逻辑
+  async function extractPDF(f, onProgress) {
     const buf = await f.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
     const pages = [];
@@ -78,6 +111,23 @@ export default function Home() {
     return out.trim();
   }
 
+  // 统一的文件提取入口
+  async function extract(f, onProgress) {
+    const fname = f.name.toLowerCase();
+    
+    if (fname.endsWith('.pdf')) {
+      return await extractPDF(f, onProgress);
+    } else if (fname.endsWith('.docx') || fname.endsWith('.doc')) {
+      onProgress && onProgress(1, 1, 'word');
+      return await extractWord(f);
+    } else if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
+      onProgress && onProgress(1, 1, 'excel');
+      return await extractExcel(f);
+    } else {
+      throw new Error(`不支持的文件格式: ${fname}`);
+    }
+  }
+
   async function run() {
     if (!files.length) return alert('请先导入项目资料');
     setBusy(true); setReport(null);
@@ -85,7 +135,13 @@ export default function Home() {
       const docs = [];
       for (let i = 0; i < files.length; i++) {
         const onProg = (cur, tot, mode) => {
-          const modeText = mode === 'ocr' ? 'OCR 识别' : '文字提取';
+          const modeMap = {
+            'ocr': 'OCR 识别',
+            'text': '文字提取',
+            'word': 'Word 文档解析',
+            'excel': 'Excel 表格解析'
+          };
+          const modeText = modeMap[mode] || mode;
           setStatus(`正在处理文件 ${i + 1}/${files.length} · 第 ${cur}/${tot} 页 · ${modeText}`);
         };
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
@@ -145,16 +201,16 @@ export default function Home() {
           </div>
 
           <div className="panel-row">
-            <label className="lbl">项目资料<span className="opt">PDF · 可多选</span></label>
+            <label className="lbl">项目资料<span className="opt">支持 PDF / Word / Excel · 可多选</span></label>
             <div className={'drop' + (over ? ' over' : '')}
               onClick={() => inputRef.current.click()}
               onDragOver={e => { e.preventDefault(); setOver(true); }}
               onDragLeave={() => setOver(false)}
               onDrop={e => { e.preventDefault(); setOver(false); addFiles(e.dataTransfer.files); }}>
-              <div className="drop-title">将项目文件夹中的 PDF 拖入此处</div>
-              <div className="drop-sub">或点击选择文件 · 扫描件将自动 OCR 识别</div>
+              <div className="drop-title">将项目文件拖入此处</div>
+              <div className="drop-sub">或点击选择文件 · 支持 PDF、Word、Excel · 扫描件自动 OCR 识别</div>
             </div>
-            <input ref={inputRef} type="file" accept=".pdf" multiple style={{ display: 'none' }}
+            <input ref={inputRef} type="file" accept=".pdf,.docx,.doc,.xlsx,.xls" multiple style={{ display: 'none' }}
               onChange={e => addFiles(e.target.files)} />
             {files.length > 0 && (
               <ul className="filelist">
