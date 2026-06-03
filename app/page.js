@@ -31,20 +31,24 @@ export default function Home() {
     setFiles(next);
   }
 
-  async function renderPage(pg, scale = 2.0) {
+  async function renderPage(pg, scale = 2.5) {
     const vp = pg.getViewport({ scale });
     const canvas = document.createElement('canvas');
-    canvas.width = vp.width; canvas.height = vp.height;
+    canvas.width = vp.width; 
+    canvas.height = vp.height;
     
-    // 使用更好的渲染质量
+    // 使用最高质量渲染
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    
     await pg.render({ 
       canvasContext: ctx, 
       viewport: vp,
-      intent: 'print' // 使用打印质量
+      intent: 'print'
     }).promise;
     
-    // 使用 PNG 格式以保留更多细节（对于表格数据）
+    // 使用 PNG 保留细节
     return canvas.toDataURL('image/png');
   }
 
@@ -84,6 +88,32 @@ export default function Home() {
     return j.text || '';
   }
 
+  // 检测低质量 OCR 文本（嵌入式 OCR 层质量差）
+  function isLowQualityOCR(text) {
+    if (!text || text.length < 50) return true;
+    
+    // 检测重复模式（如 "项目类别 | 集团内 | 项目规模" 重复多次）
+    const words = text.split(/\s+/);
+    if (words.length < 10) return true;
+    
+    // 检测短词高频重复
+    const wordCount = {};
+    words.forEach(w => {
+      if (w.length >= 2) {
+        wordCount[w] = (wordCount[w] || 0) + 1;
+      }
+    });
+    
+    const repeatWords = Object.values(wordCount).filter(c => c > 5);
+    if (repeatWords.length > 3) return true; // 有3个以上词出现5次以上
+    
+    // 检测管道符密度（表格特征）
+    const pipeCount = (text.match(/\|/g) || []).length;
+    if (pipeCount > text.length / 20) return true; // 每20字符就有一个管道符
+    
+    return false;
+  }
+
   // PDF 提取逻辑
   async function extractPDF(f, onProgress) {
     const buf = await f.arrayBuffer();
@@ -98,27 +128,42 @@ export default function Home() {
       pages.push({ pg, txt });
     }
     
-    // 第二步：逐页处理 - 文字足够就用文字，否则 OCR
+    // 第二步：逐页处理 - 文字足够且质量高就用文字，否则 OCR
     let out = '';
+    const pageDetails = []; // 记录每页使用的方法
+    
     for (let i = 0; i < pages.length; i++) {
       const page = pages[i];
       const pageNum = i + 1;
       
-      // 判断这一页是否有足够的文字内容（至少30个字符）
-      if (page.txt.length >= 30) {
+      // 判断这一页是否有足够的高质量文字内容
+      const hasEnoughText = page.txt.length >= 100; // 提高阈值到100字符
+      const isGoodQuality = !isLowQualityOCR(page.txt);
+      
+      if (hasEnoughText && isGoodQuality) {
         // 文字页：直接使用提取的文本
         onProgress && onProgress(pageNum, pages.length, 'text');
         out += page.txt + '\n';
+        pageDetails.push({ page: pageNum, method: 'text', chars: page.txt.length });
       } else {
-        // 图片页或扫描件：使用 OCR 识别
+        // 图片页或扫描件或低质量文本：使用 GLM OCR 识别
         onProgress && onProgress(pageNum, pages.length, 'ocr');
         const img = await renderPage(page.pg);
         const ocrText = await ocrImage(img);
         out += ocrText + '\n';
+        pageDetails.push({ 
+          page: pageNum, 
+          method: 'glm-ocr', 
+          chars: ocrText.length,
+          reason: !hasEnoughText ? '文本不足' : '低质量OCR'
+        });
       }
     }
     
-    return out.trim();
+    // 将页面处理详情附加到结果
+    out = out.trim();
+    out._pageDetails = pageDetails; // 附加元数据
+    return out;
   }
 
   // 统一的文件提取入口
@@ -146,7 +191,7 @@ export default function Home() {
       for (let i = 0; i < files.length; i++) {
         const onProg = (cur, tot, mode) => {
           const modeMap = {
-            'ocr': 'OCR 识别',
+            'ocr': 'GLM 视觉识别',
             'text': '文字提取',
             'word': 'Word 文档解析',
             'excel': 'Excel 表格解析'
@@ -156,7 +201,19 @@ export default function Home() {
         };
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
         const text = await extract(files[i], onProg);
-        docs.push({ name: files[i].name, text });
+        
+        // 保存文本和页面处理详情
+        const docInfo = { 
+          name: files[i].name, 
+          text: typeof text === 'string' ? text : text.toString()
+        };
+        
+        // 如果是 PDF，保存页面处理详情
+        if (text._pageDetails) {
+          docInfo.pageDetails = text._pageDetails;
+        }
+        
+        docs.push(docInfo);
       }
       setStatus('正在对照风控标准识别风险，请稍候');
       const r = await fetch('/api/analyze', {
@@ -361,9 +418,81 @@ export default function Home() {
                       { label: '日期', regex: /\d{4}\s*年\s*\d{1,2}\s*月/g, icon: '📅' },
                     ];
                     
+                    // 检查是否识别数据太少
+                    const totalDataCount = keyDataPatterns.reduce((sum, pattern) => {
+                      return sum + [...text.matchAll(pattern.regex)].length;
+                    }, 0);
+                    
+                    const hasLowQualityOCR = text.length < 3000 && (
+                      text.includes('公开招标 | 招标方式') || 
+                      /(.{2,10}\s*\|\s*){10,}/.test(text)
+                    );
+                    
                     return (
                       <div key={i} className="key-data-doc">
                         <h4>📄 {doc.name}</h4>
+                        
+                        {/* 显示 PDF 页面处理详情 */}
+                        {doc.pageDetails && doc.pageDetails.length > 0 && (
+                          <div className="page-details">
+                            <div className="page-details-summary">
+                              <strong>处理方式：</strong>
+                              {(() => {
+                                const ocrPages = doc.pageDetails.filter(p => p.method === 'glm-ocr');
+                                const textPages = doc.pageDetails.filter(p => p.method === 'text');
+                                return (
+                                  <>
+                                    {ocrPages.length > 0 && (
+                                      <span className="method-badge ocr-badge">
+                                        🤖 GLM 视觉识别 {ocrPages.length} 页
+                                      </span>
+                                    )}
+                                    {textPages.length > 0 && (
+                                      <span className="method-badge text-badge">
+                                        📝 文字提取 {textPages.length} 页
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            <details className="page-details-list">
+                              <summary>查看每页详情</summary>
+                              <table>
+                                <thead>
+                                  <tr>
+                                    <th>页码</th>
+                                    <th>处理方式</th>
+                                    <th>字符数</th>
+                                    <th>备注</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {doc.pageDetails.map((p, pi) => (
+                                    <tr key={pi}>
+                                      <td>第 {p.page} 页</td>
+                                      <td>
+                                        {p.method === 'glm-ocr' ? (
+                                          <span className="method-tag ocr-tag">🤖 GLM OCR</span>
+                                        ) : (
+                                          <span className="method-tag text-tag">📝 文字提取</span>
+                                        )}
+                                      </td>
+                                      <td>{p.chars} 字符</td>
+                                      <td>{p.reason || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </details>
+                          </div>
+                        )}
+                        
+                        {hasLowQualityOCR && (
+                          <div className="ocr-warning">
+                            ⚠️ 检测到低质量 OCR 文本层，已自动切换至 GLM 视觉识别。如仍有重复内容，建议上传 Word/Excel 原件。
+                          </div>
+                        )}
                         {keyDataPatterns.map((pattern, pi) => {
                           const matches = [...text.matchAll(pattern.regex)];
                           const uniqueMatches = [...new Set(matches.map(m => m[0]))].slice(0, 10);
@@ -379,6 +508,9 @@ export default function Home() {
                             </div>
                           );
                         })}
+                        {totalDataCount === 0 && !hasLowQualityOCR && (
+                          <div className="no-key-data">未识别到结构化数据</div>
+                        )}
                       </div>
                     );
                   })}
