@@ -54,14 +54,22 @@ export async function POST(req) {
       `==================== B. 待识别项目资料：${projectName || '未命名项目'} ====================\n${projText}`;
 
     // 4) 调用 DeepSeek（服务端，key 不暴露）
-    const resp = await fetch(process.env.DEEPSEEK_BASE_URL, {
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    const deepseekModel = 'deepseek-chat';
+    const deepseekUrl = 'https://api.deepseek.com/v1/chat/completions';
+    
+    if (!deepseekKey) {
+      return NextResponse.json({ error: '服务器配置错误：未配置 DEEPSEEK_API_KEY' }, { status: 500 });
+    }
+
+    const resp = await fetch(deepseekUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + process.env.DEEPSEEK_API_KEY,
+        Authorization: 'Bearer ' + deepseekKey,
       },
       body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+        model: deepseekModel,
         messages: [
           { role: 'system', content: SYSTEM },
           { role: 'user', content: userContent },

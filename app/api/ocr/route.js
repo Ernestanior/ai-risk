@@ -20,9 +20,10 @@ export async function POST(req) {
       }, { status: 413 });
     }
 
-    const base = process.env.VISION_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    // 智谱 AI 配置（只有 API Key 用环境变量，其他硬编码）
     const key = process.env.VISION_API_KEY;
-    const model = process.env.VISION_MODEL || 'glm-4v-plus';
+    const model = 'glm-4v-plus';
+    const baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     
     if (!key) {
       console.error('[OCR] 环境变量 VISION_API_KEY 未配置');
@@ -32,9 +33,9 @@ export async function POST(req) {
     }
 
     console.log('[OCR] 环境:', process.env.VERCEL_ENV || 'local');
-    console.log('[OCR] 调用视觉模型:', model, '| URL:', base);
+    console.log('[OCR] 调用视觉模型:', model);
 
-    const resp = await fetch(base, {
+    const resp = await fetch(baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
       body: JSON.stringify({
