@@ -45,21 +45,35 @@ export default function Home() {
     const buf = await f.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
     const pages = [];
-    let totalChars = 0;
+    
+    // 第一步：提取所有页的文本内容
     for (let p = 1; p <= pdf.numPages; p++) {
       const pg = await pdf.getPage(p);
       const c = await pg.getTextContent();
       const txt = c.items.map(i => i.str).join(' ').trim();
       pages.push({ pg, txt });
-      totalChars += txt.length;
     }
-    if (totalChars / pdf.numPages >= 30) return pages.map(x => x.txt).join('\n');
+    
+    // 第二步：逐页处理 - 文字足够就用文字，否则 OCR
     let out = '';
     for (let i = 0; i < pages.length; i++) {
-      onProgress && onProgress(i + 1, pages.length);
-      const img = await renderPage(pages[i].pg);
-      out += (await ocrImage(img)) + '\n';
+      const page = pages[i];
+      const pageNum = i + 1;
+      
+      // 判断这一页是否有足够的文字内容（至少30个字符）
+      if (page.txt.length >= 30) {
+        // 文字页：直接使用提取的文本
+        onProgress && onProgress(pageNum, pages.length, 'text');
+        out += page.txt + '\n';
+      } else {
+        // 图片页或扫描件：使用 OCR 识别
+        onProgress && onProgress(pageNum, pages.length, 'ocr');
+        const img = await renderPage(page.pg);
+        const ocrText = await ocrImage(img);
+        out += ocrText + '\n';
+      }
     }
+    
     return out.trim();
   }
 
@@ -69,8 +83,10 @@ export default function Home() {
     try {
       const docs = [];
       for (let i = 0; i < files.length; i++) {
-        const onProg = (cur, tot) =>
-          setStatus(`正在 OCR 识别扫描件 · 文件 ${i + 1}/${files.length} · 第 ${cur}/${tot} 页`);
+        const onProg = (cur, tot, mode) => {
+          const modeText = mode === 'ocr' ? 'OCR 识别' : '文字提取';
+          setStatus(`正在处理文件 ${i + 1}/${files.length} · 第 ${cur}/${tot} 页 · ${modeText}`);
+        };
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
         docs.push({ name: files[i].name, text: await extract(files[i], onProg) });
       }
