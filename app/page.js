@@ -23,12 +23,13 @@ export default function Home() {
     setFiles(next);
   }
 
-  async function renderPage(pg, scale = 1.8) {
+  async function renderPage(pg, scale = 1.5) {
     const vp = pg.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = vp.width; canvas.height = vp.height;
     await pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    return canvas.toDataURL('image/png');
+    // 使用 JPEG 格式和压缩质量来减小图片大小
+    return canvas.toDataURL('image/jpeg', 0.85);
   }
 
   async function ocrImage(dataURL) {

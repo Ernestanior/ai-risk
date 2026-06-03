@@ -1,5 +1,15 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "functions": {
+    "app/api/ocr/route.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/analyze/route.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
 }

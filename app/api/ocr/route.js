@@ -3,19 +3,44 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
+// Vercel 配置：增加请求体大小限制
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 // 接收一页扫描图片(base64 data URL)，调用视觉大模型转写为文字。
-// 默认用智谱 GLM-4V（glm-4v-flash 免费档）。可在 .env.local 切换。
 export async function POST(req) {
   try {
     const { image } = await req.json(); // data:image/png;base64,xxx
     if (!image) return NextResponse.json({ error: '缺少图片' }, { status: 400 });
 
+    // 检查图片大小（Base64 编码后的大小）
+    const imageSize = image.length;
+    const imageSizeMB = (imageSize / 1024 / 1024).toFixed(2);
+    console.log(`[OCR] 图片大小: ${imageSizeMB}MB`);
+    
+    if (imageSize > 10 * 1024 * 1024) {
+      return NextResponse.json({ 
+        error: `图片过大 (${imageSizeMB}MB)，请降低 PDF 渲染分辨率` 
+      }, { status: 413 });
+    }
+
     const base = process.env.VISION_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     const key = process.env.VISION_API_KEY;
     const model = process.env.VISION_MODEL || 'glm-4v-plus';
     
-    if (!key) return NextResponse.json({ error: '未配置 VISION_API_KEY（视觉模型 key）' }, { status: 500 });
+    if (!key) {
+      console.error('[OCR] 环境变量 VISION_API_KEY 未配置');
+      return NextResponse.json({ 
+        error: '服务器配置错误：未配置 VISION_API_KEY' 
+      }, { status: 500 });
+    }
 
+    console.log('[OCR] 环境:', process.env.VERCEL_ENV || 'local');
     console.log('[OCR] 调用视觉模型:', model, '| URL:', base);
 
     const resp = await fetch(base, {
