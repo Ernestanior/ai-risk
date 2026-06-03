@@ -160,10 +160,11 @@ export default function Home() {
       }
     }
     
-    // 将页面处理详情附加到结果
-    out = out.trim();
-    out._pageDetails = pageDetails; // 附加元数据
-    return out;
+    // 返回文本和页面处理详情
+    return {
+      text: out.trim(),
+      pageDetails: pageDetails
+    };
   }
 
   // 统一的文件提取入口
@@ -174,10 +175,12 @@ export default function Home() {
       return await extractPDF(f, onProgress);
     } else if (fname.endsWith('.docx') || fname.endsWith('.doc')) {
       onProgress && onProgress(1, 1, 'word');
-      return await extractWord(f);
+      const text = await extractWord(f);
+      return { text };
     } else if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
       onProgress && onProgress(1, 1, 'excel');
-      return await extractExcel(f);
+      const text = await extractExcel(f);
+      return { text };
     } else {
       throw new Error(`不支持的文件格式: ${fname}`);
     }
@@ -200,17 +203,17 @@ export default function Home() {
           setStatus(`正在处理文件 ${i + 1}/${files.length} · 第 ${cur}/${tot} 页 · ${modeText}`);
         };
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
-        const text = await extract(files[i], onProg);
+        const result = await extract(files[i], onProg);
         
-        // 保存文本和页面处理详情
+        // 处理返回结果（可能是对象或字符串）
         const docInfo = { 
           name: files[i].name, 
-          text: typeof text === 'string' ? text : text.toString()
+          text: typeof result === 'string' ? result : result.text
         };
         
-        // 如果是 PDF，保存页面处理详情
-        if (text._pageDetails) {
-          docInfo.pageDetails = text._pageDetails;
+        // 如果有页面处理详情（PDF），保存它
+        if (result.pageDetails) {
+          docInfo.pageDetails = result.pageDetails;
         }
         
         docs.push(docInfo);
