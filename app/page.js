@@ -8,6 +8,8 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [over, setOver] = useState(false);
+  const [extractedTexts, setExtractedTexts] = useState([]); // 新增：保存识别的文本
+  const [showExtractedText, setShowExtractedText] = useState(false); // 新增：是否显示文本
   const inputRef = useRef();
 
   useEffect(() => {
@@ -29,13 +31,21 @@ export default function Home() {
     setFiles(next);
   }
 
-  async function renderPage(pg, scale = 1.5) {
+  async function renderPage(pg, scale = 2.0) {
     const vp = pg.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = vp.width; canvas.height = vp.height;
-    await pg.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
-    // 使用 JPEG 格式和压缩质量来减小图片大小
-    return canvas.toDataURL('image/jpeg', 0.85);
+    
+    // 使用更好的渲染质量
+    const ctx = canvas.getContext('2d');
+    await pg.render({ 
+      canvasContext: ctx, 
+      viewport: vp,
+      intent: 'print' // 使用打印质量
+    }).promise;
+    
+    // 使用 PNG 格式以保留更多细节（对于表格数据）
+    return canvas.toDataURL('image/png');
   }
 
   async function ocrImage(dataURL) {
@@ -130,9 +140,10 @@ export default function Home() {
 
   async function run() {
     if (!files.length) return alert('请先导入项目资料');
-    setBusy(true); setReport(null);
+    setBusy(true); setReport(null); setExtractedTexts([]);
     try {
       const docs = [];
+      const texts = []; // 保存识别的文本
       for (let i = 0; i < files.length; i++) {
         const onProg = (cur, tot, mode) => {
           const modeMap = {
@@ -145,8 +156,11 @@ export default function Home() {
           setStatus(`正在处理文件 ${i + 1}/${files.length} · 第 ${cur}/${tot} 页 · ${modeText}`);
         };
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
-        docs.push({ name: files[i].name, text: await extract(files[i], onProg) });
+        const text = await extract(files[i], onProg);
+        docs.push({ name: files[i].name, text });
+        texts.push({ name: files[i].name, text }); // 保存用于查看
       }
+      setExtractedTexts(texts); // 设置识别的文本
       setStatus('正在对照风控标准识别风险，请稍候');
       const r = await fetch('/api/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -278,6 +292,34 @@ export default function Home() {
                 </li>
               ))}
             </ol>
+          </section>
+        )}
+
+        {extractedTexts.length > 0 && (
+          <section className="debug-section">
+            <button 
+              className="ghost" 
+              onClick={() => setShowExtractedText(!showExtractedText)}
+              style={{ marginTop: '20px' }}
+            >
+              {showExtractedText ? '隐藏识别文本' : '查看识别文本（调试用）'}
+            </button>
+            
+            {showExtractedText && (
+              <div className="extracted-text-panel">
+                {extractedTexts.map((doc, i) => (
+                  <div key={i} className="extracted-text-item">
+                    <h3>📄 {doc.name}</h3>
+                    <div className="extracted-text-stats">
+                      识别字符数: {doc.text.length} · 
+                      包含"毛利率": {doc.text.includes('毛利率') ? '✅ 是' : '❌ 否'} · 
+                      包含"5.02": {doc.text.includes('5.02') ? '✅ 是' : '❌ 否'}
+                    </div>
+                    <pre className="extracted-text-content">{doc.text}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
       </main>
