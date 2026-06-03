@@ -3,15 +3,6 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-// Vercel 配置：增加请求体大小限制
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
-
 // 接收一页扫描图片(base64 data URL)，调用视觉大模型转写为文字。
 export async function POST(req) {
   try {
