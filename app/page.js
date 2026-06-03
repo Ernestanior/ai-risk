@@ -8,8 +8,8 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState(null);
   const [over, setOver] = useState(false);
-  const [extractedTexts, setExtractedTexts] = useState([]); // 新增：保存识别的文本
-  const [showExtractedText, setShowExtractedText] = useState(false); // 新增：是否显示文本
+  const [analysisInput, setAnalysisInput] = useState(null); // 改：保存发送给AI的完整输入
+  const [showAnalysisInput, setShowAnalysisInput] = useState(false);
   const inputRef = useRef();
 
   useEffect(() => {
@@ -140,10 +140,9 @@ export default function Home() {
 
   async function run() {
     if (!files.length) return alert('请先导入项目资料');
-    setBusy(true); setReport(null); setExtractedTexts([]);
+    setBusy(true); setReport(null); setAnalysisInput(null);
     try {
       const docs = [];
-      const texts = []; // 保存识别的文本
       for (let i = 0; i < files.length; i++) {
         const onProg = (cur, tot, mode) => {
           const modeMap = {
@@ -158,9 +157,7 @@ export default function Home() {
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
         const text = await extract(files[i], onProg);
         docs.push({ name: files[i].name, text });
-        texts.push({ name: files[i].name, text }); // 保存用于查看
       }
-      setExtractedTexts(texts); // 设置识别的文本
       setStatus('正在对照风控标准识别风险，请稍候');
       const r = await fetch('/api/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -168,6 +165,14 @@ export default function Home() {
       });
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || '请求失败');
+      
+      // 保存分析输入数据
+      setAnalysisInput({
+        projectName: projectName || files[0].name,
+        documents: docs,
+        meta: data.meta
+      });
+      
       setReport(data); setStatus('');
     } catch (e) {
       setStatus('错误：' + e.message);
@@ -295,29 +300,99 @@ export default function Home() {
           </section>
         )}
 
-        {extractedTexts.length > 0 && (
+        {analysisInput && (
           <section className="debug-section">
             <button 
               className="ghost" 
-              onClick={() => setShowExtractedText(!showExtractedText)}
+              onClick={() => setShowAnalysisInput(!showAnalysisInput)}
               style={{ marginTop: '20px' }}
             >
-              {showExtractedText ? '隐藏识别文本' : '查看识别文本（调试用）'}
+              {showAnalysisInput ? '隐藏分析数据' : '查看 AI 分析的数据（调试）'}
             </button>
             
-            {showExtractedText && (
+            {showAnalysisInput && (
               <div className="extracted-text-panel">
-                {extractedTexts.map((doc, i) => (
-                  <div key={i} className="extracted-text-item">
-                    <h3>📄 {doc.name}</h3>
-                    <div className="extracted-text-stats">
-                      识别字符数: {doc.text.length} · 
-                      包含"毛利率": {doc.text.includes('毛利率') ? '✅ 是' : '❌ 否'} · 
-                      包含"5.02": {doc.text.includes('5.02') ? '✅ 是' : '❌ 否'}
+                <div className="analysis-summary">
+                  <h3>📊 数据概览</h3>
+                  <div className="summary-grid">
+                    <div className="summary-item">
+                      <div className="summary-label">项目名称</div>
+                      <div className="summary-value">{analysisInput.projectName}</div>
                     </div>
-                    <pre className="extracted-text-content">{doc.text}</pre>
+                    <div className="summary-item">
+                      <div className="summary-label">文档数量</div>
+                      <div className="summary-value">{analysisInput.documents.length} 个</div>
+                    </div>
+                    <div className="summary-item">
+                      <div className="summary-label">项目资料字符</div>
+                      <div className="summary-value">
+                        {analysisInput.documents.reduce((sum, d) => sum + d.text.length, 0).toLocaleString()} 字符
+                      </div>
+                    </div>
+                    {analysisInput.meta && (
+                      <>
+                        <div className="summary-item">
+                          <div className="summary-label">参考资料</div>
+                          <div className="summary-value">{analysisInput.meta.refCount} 份风控制度</div>
+                        </div>
+                        <div className="summary-item">
+                          <div className="summary-label">参考资料字符</div>
+                          <div className="summary-value">{(analysisInput.meta.refChars / 1000).toFixed(1)} 千字</div>
+                        </div>
+                        {analysisInput.meta.usage && (
+                          <div className="summary-item">
+                            <div className="summary-label">Token 用量</div>
+                            <div className="summary-value">{analysisInput.meta.usage.total_tokens.toLocaleString()}</div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                ))}
+                </div>
+
+                <div className="key-data-section">
+                  <h3>🔑 识别的关键数据</h3>
+                  {analysisInput.documents.map((doc, i) => {
+                    const text = doc.text;
+                    const keyDataPatterns = [
+                      { label: '金额', regex: /(\d+\.?\d*)\s*万元/g, icon: '💰' },
+                      { label: '毛利率', regex: /(毛利率|净额毛利率)[：:]\s*(\d+\.?\d*)\s*%/g, icon: '📊' },
+                      { label: '百分比', regex: /(\d+\.?\d*)\s*%/g, icon: '📈' },
+                      { label: '日期', regex: /\d{4}\s*年\s*\d{1,2}\s*月/g, icon: '📅' },
+                    ];
+                    
+                    return (
+                      <div key={i} className="key-data-doc">
+                        <h4>📄 {doc.name}</h4>
+                        {keyDataPatterns.map((pattern, pi) => {
+                          const matches = [...text.matchAll(pattern.regex)];
+                          const uniqueMatches = [...new Set(matches.map(m => m[0]))].slice(0, 10);
+                          if (uniqueMatches.length === 0) return null;
+                          return (
+                            <div key={pi} className="key-data-group">
+                              <span className="key-data-icon">{pattern.icon}</span>
+                              <span className="key-data-label">{pattern.label}：</span>
+                              <span className="key-data-values">
+                                {uniqueMatches.join(' · ')}
+                                {matches.length > 10 && ` 等 ${matches.length} 项`}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <details className="full-text-details">
+                  <summary>📝 查看完整的项目资料文本</summary>
+                  {analysisInput.documents.map((doc, i) => (
+                    <div key={i} className="extracted-text-item">
+                      <h4>📄 {doc.name} ({doc.text.length} 字符)</h4>
+                      <pre className="extracted-text-content">{doc.text}</pre>
+                    </div>
+                  ))}
+                </details>
               </div>
             )}
           </section>
