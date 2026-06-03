@@ -12,8 +12,11 @@ export async function POST(req) {
 
     const base = process.env.VISION_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     const key = process.env.VISION_API_KEY;
-    const model = process.env.VISION_MODEL || 'glm-4v-flash';
+    const model = process.env.VISION_MODEL || 'glm-4v';
+    
     if (!key) return NextResponse.json({ error: '未配置 VISION_API_KEY（视觉模型 key）' }, { status: 500 });
+
+    console.log('[OCR] 调用视觉模型:', model, '| URL:', base);
 
     const resp = await fetch(base, {
       method: 'POST',
@@ -30,14 +33,19 @@ export async function POST(req) {
         temperature: 0.1,
       }),
     });
+    
     if (!resp.ok) {
       const t = await resp.text();
+      console.error('[OCR] 视觉模型错误:', resp.status, t);
       return NextResponse.json({ error: `视觉模型 ${resp.status}: ${t.slice(0, 300)}` }, { status: 502 });
     }
+    
     const j = await resp.json();
+    console.log('[OCR] 响应:', JSON.stringify(j).slice(0, 200));
     const text = j.choices?.[0]?.message?.content || '';
     return NextResponse.json({ text });
   } catch (e) {
+    console.error('[OCR] 异常:', e);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
