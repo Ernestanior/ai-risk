@@ -25,6 +25,10 @@ export async function POST(req) {
     const modelName = model === 'glm-5v' ? 'glm-5v-turbo' : 'glm-4v-flash';
     const baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     
+    console.log('[OCR] 接收到的 model 参数:', model);
+    console.log('[OCR] 将使用的 modelName:', modelName);
+    console.log('[OCR] model === "glm-5v"?', model === 'glm-5v');
+    
     if (!apiKey) {
       const errMsg = 'VISION_API_KEY 未配置';
       console.error(`[OCR] ${errMsg}`);
