@@ -11,7 +11,7 @@ export default function Home() {
   const [analysisInput, setAnalysisInput] = useState(null); // 改：保存发送给AI的完整输入
   const [showAnalysisInput, setShowAnalysisInput] = useState(false);
   const [forceOCR, setForceOCR] = useState(false); // 强制使用视觉识别
-  const [visionModel, setVisionModel] = useState('glm-5v'); // 视觉模型选择：glm-5v 或 glm-ocr
+  const [visionModel, setVisionModel] = useState('glm-4v'); // 视觉模型选择：glm-4v 或 glm-5v
   const inputRef = useRef();
 
   useEffect(() => {
@@ -313,27 +313,27 @@ export default function Home() {
                 <input 
                   type="radio" 
                   name="visionModel"
-                  value="glm-5v"
-                  checked={visionModel === 'glm-5v'} 
+                  value="glm-4v"
+                  checked={visionModel === 'glm-4v'} 
                   onChange={(e) => setVisionModel(e.target.value)}
                   style={{ marginRight: '6px' }}
                 />
-                GLM-5V-Turbo（推荐）
+                GLM-4V-Flash（默认）
               </label>
               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <input 
                   type="radio" 
                   name="visionModel"
-                  value="glm-ocr"
-                  checked={visionModel === 'glm-ocr'} 
+                  value="glm-5v"
+                  checked={visionModel === 'glm-5v'} 
                   onChange={(e) => setVisionModel(e.target.value)}
                   style={{ marginRight: '6px' }}
                 />
-                GLM-4.6V-Flash（更快）
+                GLM-5V-Turbo（备选）
               </label>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '5px' }}>
-              💡 GLM-5V-Turbo 识别精度更高，4.6V-Flash 速度更快
+              💡 GLM-4V-Flash 速度快，GLM-5V-Turbo 识别精度更高
             </div>
           </div>
 
