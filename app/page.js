@@ -59,6 +59,15 @@ export default function Home() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: dataURL, model: visionModel }),
     });
+    
+    // 检查响应类型
+    const contentType = r.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await r.text();
+      console.error('[OCR] 非 JSON 响应:', text.slice(0, 500));
+      throw new Error(`OCR API 返回了非 JSON 响应（${r.status}）`);
+    }
+    
     const j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || 'OCR 失败');
     return j.text || '';
@@ -72,6 +81,14 @@ export default function Home() {
       headers: { 'Content-Type': 'application/octet-stream' },
       body: buf,
     });
+    
+    const contentType = r.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await r.text();
+      console.error('[Word] 非 JSON 响应:', text.slice(0, 500));
+      throw new Error(`Word API 返回了非 JSON 响应（${r.status}）`);
+    }
+    
     const j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || 'Word 提取失败');
     return j.text || '';
@@ -85,6 +102,14 @@ export default function Home() {
       headers: { 'Content-Type': 'application/octet-stream' },
       body: buf,
     });
+    
+    const contentType = r.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await r.text();
+      console.error('[Excel] 非 JSON 响应:', text.slice(0, 500));
+      throw new Error(`Excel API 返回了非 JSON 响应（${r.status}）`);
+    }
+    
     const j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || 'Excel 提取失败');
     return j.text || '';
@@ -226,6 +251,15 @@ export default function Home() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectName: projectName || files[0].name, documents: docs }),
       });
+      
+      // 检查响应类型
+      const contentType = r.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await r.text();
+        console.error('[分析] 非 JSON 响应:', text.slice(0, 500));
+        throw new Error(`服务器返回了非 JSON 响应（${r.status}）。可能是 API 路由错误或服务器问题。`);
+      }
+      
       const data = await r.json();
       if (!r.ok || data.error) throw new Error(data.error || '请求失败');
       
