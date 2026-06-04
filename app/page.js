@@ -10,6 +10,7 @@ export default function Home() {
   const [over, setOver] = useState(false);
   const [analysisInput, setAnalysisInput] = useState(null); // 改：保存发送给AI的完整输入
   const [showAnalysisInput, setShowAnalysisInput] = useState(false);
+  const [forceOCR, setForceOCR] = useState(false); // 强制使用 GLM OCR
   const inputRef = useRef();
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export default function Home() {
   }
 
   // PDF 提取逻辑
-  async function extractPDF(f, onProgress) {
+  async function extractPDF(f, onProgress, forceGLM = false) {
     const buf = await f.arrayBuffer();
     const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
     const pages = [];
@@ -140,13 +141,9 @@ export default function Home() {
       const hasEnoughText = page.txt.length >= 100; // 提高阈值到100字符
       const isGoodQuality = !isLowQualityOCR(page.txt);
       
-      if (hasEnoughText && isGoodQuality) {
-        // 文字页：直接使用提取的文本
-        onProgress && onProgress(pageNum, pages.length, 'text');
-        out += page.txt + '\n';
-        pageDetails.push({ page: pageNum, method: 'text', chars: page.txt.length });
-      } else {
-        // 图片页或扫描件或低质量文本：使用 GLM OCR 识别
+      // 强制模式：所有页都用 GLM OCR
+      if (forceGLM || !hasEnoughText || !isGoodQuality) {
+        // 使用 GLM OCR 识别
         onProgress && onProgress(pageNum, pages.length, 'ocr');
         const img = await renderPage(page.pg);
         const ocrText = await ocrImage(img);
@@ -155,8 +152,13 @@ export default function Home() {
           page: pageNum, 
           method: 'glm-ocr', 
           chars: ocrText.length,
-          reason: !hasEnoughText ? '文本不足' : '低质量OCR'
+          reason: forceGLM ? '强制GLM模式' : (!hasEnoughText ? '文本不足' : '低质量OCR')
         });
+      } else {
+        // 文字页：直接使用提取的文本
+        onProgress && onProgress(pageNum, pages.length, 'text');
+        out += page.txt + '\n';
+        pageDetails.push({ page: pageNum, method: 'text', chars: page.txt.length });
       }
     }
     
@@ -168,11 +170,11 @@ export default function Home() {
   }
 
   // 统一的文件提取入口
-  async function extract(f, onProgress) {
+  async function extract(f, onProgress, forceGLM = false) {
     const fname = f.name.toLowerCase();
     
     if (fname.endsWith('.pdf')) {
-      return await extractPDF(f, onProgress);
+      return await extractPDF(f, onProgress, forceGLM);
     } else if (fname.endsWith('.docx') || fname.endsWith('.doc')) {
       onProgress && onProgress(1, 1, 'word');
       const text = await extractWord(f);
@@ -203,7 +205,7 @@ export default function Home() {
           setStatus(`正在处理文件 ${i + 1}/${files.length} · 第 ${cur}/${tot} 页 · ${modeText}`);
         };
         setStatus(`正在解析文档 ${i + 1}/${files.length} · ${files[i].name}`);
-        const result = await extract(files[i], onProg);
+        const result = await extract(files[i], onProg, forceOCR);
         
         // 处理返回结果（可能是对象或字符串）
         const docInfo = { 
@@ -301,6 +303,21 @@ export default function Home() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="panel-row">
+            <label className="lbl">
+              <input 
+                type="checkbox" 
+                checked={forceOCR} 
+                onChange={(e) => setForceOCR(e.target.checked)}
+                style={{ marginRight: '8px', verticalAlign: 'middle' }}
+              />
+              强制使用 GLM 视觉识别（忽略 PDF 文本层，所有页面都用 OCR）
+            </label>
+            <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '5px', marginLeft: '24px' }}>
+              ⚠️ 开启后处理速度较慢，但可以看到 GLM 真实识别效果
+            </div>
           </div>
 
           <div className="actions">
