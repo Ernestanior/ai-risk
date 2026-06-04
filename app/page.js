@@ -394,7 +394,7 @@ export default function Home() {
           </div>
         </section>
 
-        {report && (
+        {report && false && (
           <section className="report">
             <div className="rep-head">
               <div>
@@ -445,174 +445,93 @@ export default function Home() {
 
         {analysisInput && (
           <section className="debug-section">
-            <button 
-              className="ghost" 
-              onClick={() => setShowAnalysisInput(!showAnalysisInput)}
-              style={{ marginTop: '20px' }}
-            >
-              {showAnalysisInput ? '隐藏分析数据' : '查看 AI 分析的数据（调试）'}
-            </button>
+            <h2 style={{ fontSize: '20px', marginBottom: '20px', color: 'var(--ink)' }}>
+              📄 识别出的原始文本（发送给 DeepSeek 的内容）
+            </h2>
             
-            {showAnalysisInput && (
-              <div className="extracted-text-panel">
-                <div className="analysis-summary">
-                  <h3>📊 数据概览</h3>
-                  <div className="summary-grid">
-                    <div className="summary-item">
-                      <div className="summary-label">项目名称</div>
-                      <div className="summary-value">{analysisInput.projectName}</div>
-                    </div>
-                    <div className="summary-item">
-                      <div className="summary-label">文档数量</div>
-                      <div className="summary-value">{analysisInput.documents.length} 个</div>
-                    </div>
-                    <div className="summary-item">
-                      <div className="summary-label">项目资料字符</div>
-                      <div className="summary-value">
-                        {analysisInput.documents.reduce((sum, d) => sum + d.text.length, 0).toLocaleString()} 字符
-                      </div>
-                    </div>
-                    {analysisInput.meta && (
-                      <>
-                        <div className="summary-item">
-                          <div className="summary-label">参考资料</div>
-                          <div className="summary-value">{analysisInput.meta.refCount} 份风控制度</div>
-                        </div>
-                        <div className="summary-item">
-                          <div className="summary-label">参考资料字符</div>
-                          <div className="summary-value">{(analysisInput.meta.refChars / 1000).toFixed(1)} 千字</div>
-                        </div>
-                        {analysisInput.meta.usage && (
-                          <div className="summary-item">
-                            <div className="summary-label">Token 用量</div>
-                            <div className="summary-value">{analysisInput.meta.usage.total_tokens.toLocaleString()}</div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="key-data-section">
-                  <h3>🔑 识别的关键数据</h3>
-                  {analysisInput.documents.map((doc, i) => {
-                    const text = doc.text;
-                    const keyDataPatterns = [
-                      { label: '金额', regex: /(\d+\.?\d*)\s*万元/g, icon: '💰' },
-                      { label: '毛利率', regex: /(毛利率|净额毛利率)[：:]\s*(\d+\.?\d*)\s*%/g, icon: '📊' },
-                      { label: '百分比', regex: /(\d+\.?\d*)\s*%/g, icon: '📈' },
-                      { label: '日期', regex: /\d{4}\s*年\s*\d{1,2}\s*月/g, icon: '📅' },
-                    ];
-                    
-                    // 检查是否识别数据太少
-                    const totalDataCount = keyDataPatterns.reduce((sum, pattern) => {
-                      return sum + [...text.matchAll(pattern.regex)].length;
-                    }, 0);
-                    
-                    const hasLowQualityOCR = text.length < 3000 && (
-                      text.includes('公开招标 | 招标方式') || 
-                      /(.{2,10}\s*\|\s*){10,}/.test(text)
-                    );
-                    
-                    return (
-                      <div key={i} className="key-data-doc">
-                        <h4>📄 {doc.name}</h4>
-                        
-                        {/* 显示 PDF 页面处理详情 */}
-                        {doc.pageDetails && doc.pageDetails.length > 0 && (
-                          <div className="page-details">
-                            <div className="page-details-summary">
-                              <strong>处理方式：</strong>
-                              {(() => {
-                                const ocrPages = doc.pageDetails.filter(p => p.method === 'glm-ocr');
-                                const textPages = doc.pageDetails.filter(p => p.method === 'text');
-                                return (
-                                  <>
-                                    {ocrPages.length > 0 && (
-                                      <span className="method-badge ocr-badge">
-                                        🤖 GLM 视觉识别 {ocrPages.length} 页
-                                      </span>
-                                    )}
-                                    {textPages.length > 0 && (
-                                      <span className="method-badge text-badge">
-                                        📝 文字提取 {textPages.length} 页
-                                      </span>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                            <details className="page-details-list">
-                              <summary>查看每页详情</summary>
-                              <table>
-                                <thead>
-                                  <tr>
-                                    <th>页码</th>
-                                    <th>处理方式</th>
-                                    <th>字符数</th>
-                                    <th>备注</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {doc.pageDetails.map((p, pi) => (
-                                    <tr key={pi}>
-                                      <td>第 {p.page} 页</td>
-                                      <td>
-                                        {p.method === 'glm-ocr' ? (
-                                          <span className="method-tag ocr-tag">🤖 GLM OCR</span>
-                                        ) : (
-                                          <span className="method-tag text-tag">📝 文字提取</span>
-                                        )}
-                                      </td>
-                                      <td>{p.chars} 字符</td>
-                                      <td>{p.reason || '-'}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </details>
-                          </div>
-                        )}
-                        
-                        {hasLowQualityOCR && (
-                          <div className="ocr-warning">
-                            ⚠️ 检测到低质量 OCR 文本层，已自动切换至 GLM 视觉识别。如仍有重复内容，建议上传 Word/Excel 原件。
-                          </div>
-                        )}
-                        {keyDataPatterns.map((pattern, pi) => {
-                          const matches = [...text.matchAll(pattern.regex)];
-                          const uniqueMatches = [...new Set(matches.map(m => m[0]))].slice(0, 10);
-                          if (uniqueMatches.length === 0) return null;
-                          return (
-                            <div key={pi} className="key-data-group">
-                              <span className="key-data-icon">{pattern.icon}</span>
-                              <span className="key-data-label">{pattern.label}：</span>
-                              <span className="key-data-values">
-                                {uniqueMatches.join(' · ')}
-                                {matches.length > 10 && ` 等 ${matches.length} 项`}
+            {analysisInput.documents.map((doc, i) => (
+              <div key={i} className="extracted-text-panel" style={{ marginBottom: '30px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px', color: 'var(--ink-2)' }}>
+                  📄 {doc.name} ({doc.text.length} 字符)
+                </h3>
+                
+                {/* 显示 PDF 页面处理详情 */}
+                {doc.pageDetails && doc.pageDetails.length > 0 && (
+                  <div className="page-details" style={{ marginBottom: '15px' }}>
+                    <div className="page-details-summary">
+                      <strong>处理方式：</strong>
+                      {(() => {
+                        const ocrPages = doc.pageDetails.filter(p => p.method === 'glm-ocr');
+                        const textPages = doc.pageDetails.filter(p => p.method === 'text');
+                        return (
+                          <>
+                            {ocrPages.length > 0 && (
+                              <span className="method-badge ocr-badge">
+                                🤖 GLM 视觉识别 {ocrPages.length} 页
                               </span>
-                            </div>
-                          );
-                        })}
-                        {totalDataCount === 0 && !hasLowQualityOCR && (
-                          <div className="no-key-data">未识别到结构化数据</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <details className="full-text-details">
-                  <summary>📝 查看完整的项目资料文本</summary>
-                  {analysisInput.documents.map((doc, i) => (
-                    <div key={i} className="extracted-text-item">
-                      <h4>📄 {doc.name} ({doc.text.length} 字符)</h4>
-                      <pre className="extracted-text-content">{doc.text}</pre>
+                            )}
+                            {textPages.length > 0 && (
+                              <span className="method-badge text-badge">
+                                📝 PDF文字提取 {textPages.length} 页
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
-                  ))}
-                </details>
+                    <details className="page-details-list">
+                      <summary>查看每页详情</summary>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>页码</th>
+                            <th>处理方式</th>
+                            <th>字符数</th>
+                            <th>备注</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {doc.pageDetails.map((p, pi) => (
+                            <tr key={pi}>
+                              <td>第 {p.page} 页</td>
+                              <td>
+                                {p.method === 'glm-ocr' ? (
+                                  <span className="method-tag ocr-tag">🤖 GLM OCR</span>
+                                ) : (
+                                  <span className="method-tag text-tag">📝 文字提取</span>
+                                )}
+                              </td>
+                              <td>{p.chars} 字符</td>
+                              <td>{p.reason || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  </div>
+                )}
+                
+                {/* 原始文本内容 */}
+                <div style={{ 
+                  background: '#f5f5f5', 
+                  border: '1px solid var(--line)', 
+                  borderRadius: '4px',
+                  padding: '20px',
+                  maxHeight: '600px',
+                  overflowY: 'auto'
+                }}>
+                  <pre style={{ 
+                    margin: 0,
+                    fontSize: '14px',
+                    lineHeight: '1.8',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word',
+                    color: 'var(--ink)',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif"
+                  }}>{doc.text}</pre>
+                </div>
               </div>
-            )}
+            ))}
           </section>
         )}
       </main>
