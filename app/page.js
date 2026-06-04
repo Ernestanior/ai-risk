@@ -329,11 +329,11 @@ export default function Home() {
                   onChange={(e) => setVisionModel(e.target.value)}
                   style={{ marginRight: '6px' }}
                 />
-                GLM-4V-Flash（更快）
+                GLM-4.6V-Flash（更快）
               </label>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '5px' }}>
-              💡 GLM-5V-Turbo 识别精度更高，Flash 速度更快
+              💡 GLM-5V-Turbo 识别精度更高，4.6V-Flash 速度更快
             </div>
           </div>
 

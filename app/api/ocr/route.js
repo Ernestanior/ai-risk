@@ -22,7 +22,7 @@ export async function POST(req) {
 
     // 智谱 GLM 模型配置
     const apiKey = process.env.VISION_API_KEY;
-    const modelName = model === 'glm-ocr' ? 'glm-4v-flash' : 'glm-5v-turbo';
+    const modelName = model === 'glm-ocr' ? 'glm-4.6v-flash' : 'glm-5v-turbo';
     const baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     
     if (!apiKey) {
