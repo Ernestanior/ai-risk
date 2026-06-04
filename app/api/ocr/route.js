@@ -6,13 +6,13 @@ export const maxDuration = 120;
 // 接收一页扫描图片(base64 data URL)，调用视觉大模型转写为文字。
 export async function POST(req) {
   try {
-    const { image } = await req.json(); // data:image/png;base64,xxx
+    const { image, model = 'glm' } = await req.json(); // data:image/png;base64,xxx
     if (!image) return NextResponse.json({ error: '缺少图片' }, { status: 400 });
 
     // 检查图片大小（Base64 编码后的大小）
     const imageSize = image.length;
     const imageSizeMB = (imageSize / 1024 / 1024).toFixed(2);
-    console.log(`[OCR] 图片大小: ${imageSizeMB}MB`);
+    console.log(`[OCR] 图片大小: ${imageSizeMB}MB, 模型: ${model}`);
     
     if (imageSize > 10 * 1024 * 1024) {
       return NextResponse.json({ 
@@ -20,26 +20,39 @@ export async function POST(req) {
       }, { status: 413 });
     }
 
-    // 智谱 AI 配置（只有 API Key 用环境变量，其他硬编码）
-    const key = process.env.VISION_API_KEY;
-    const model = 'glm-4v-plus';
-    const baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    // 模型配置
+    let apiKey, modelName, baseUrl;
     
-    if (!key) {
-      console.error('[OCR] 环境变量 VISION_API_KEY 未配置');
+    if (model === 'qwen') {
+      // 阿里通义千问 VL
+      apiKey = process.env.QWEN_API_KEY;
+      modelName = 'qwen-vl-max';
+      baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+    } else {
+      // 智谱 GLM (默认)
+      apiKey = process.env.VISION_API_KEY;
+      modelName = 'glm-5v-turbo';
+      baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+    }
+    
+    if (!apiKey) {
+      console.error(`[OCR] 环境变量未配置: ${model === 'qwen' ? 'QWEN_API_KEY' : 'VISION_API_KEY'}`);
       return NextResponse.json({ 
-        error: '服务器配置错误：未配置 VISION_API_KEY' 
+        error: `服务器配置错误：未配置 ${model === 'qwen' ? 'QWEN_API_KEY' : 'VISION_API_KEY'}` 
       }, { status: 500 });
     }
 
     console.log('[OCR] 环境:', process.env.VERCEL_ENV || 'local');
-    console.log('[OCR] 调用视觉模型:', model);
+    console.log('[OCR] 调用视觉模型:', modelName);
 
     const resp = await fetch(baseUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
+      headers: { 
+        'Content-Type': 'application/json', 
+        Authorization: 'Bearer ' + apiKey 
+      },
       body: JSON.stringify({
-        model,
+        model: modelName,
         messages: [{
           role: 'user',
           content: [

@@ -11,6 +11,7 @@ export default function Home() {
   const [analysisInput, setAnalysisInput] = useState(null); // 改：保存发送给AI的完整输入
   const [showAnalysisInput, setShowAnalysisInput] = useState(false);
   const [forceOCR, setForceOCR] = useState(false); // 强制使用 GLM OCR
+  const [visionModel, setVisionModel] = useState('glm'); // 视觉模型选择：glm 或 qwen
   const inputRef = useRef();
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function Home() {
   async function ocrImage(dataURL) {
     const r = await fetch('/api/ocr', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataURL }),
+      body: JSON.stringify({ image: dataURL, model: visionModel }),
     });
     const j = await r.json();
     if (!r.ok || j.error) throw new Error(j.error || 'OCR 失败');
@@ -306,6 +307,37 @@ export default function Home() {
           </div>
 
           <div className="panel-row">
+            <label className="lbl">识别模型选择</label>
+            <div style={{ display: 'flex', gap: '15px', marginTop: '5px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="visionModel"
+                  value="glm"
+                  checked={visionModel === 'glm'} 
+                  onChange={(e) => setVisionModel(e.target.value)}
+                  style={{ marginRight: '6px' }}
+                />
+                智谱 GLM-5V-Turbo（当前）
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="visionModel"
+                  value="qwen"
+                  checked={visionModel === 'qwen'} 
+                  onChange={(e) => setVisionModel(e.target.value)}
+                  style={{ marginRight: '6px' }}
+                />
+                阿里通义千问 VL-Max（推荐）
+              </label>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '5px' }}>
+              💡 千问 VL-Max 对中文表格识别效果更好
+            </div>
+          </div>
+
+          <div className="panel-row">
             <label className="lbl">
               <input 
                 type="checkbox" 
@@ -313,10 +345,10 @@ export default function Home() {
                 onChange={(e) => setForceOCR(e.target.checked)}
                 style={{ marginRight: '8px', verticalAlign: 'middle' }}
               />
-              强制使用 GLM 视觉识别（忽略 PDF 文本层，所有页面都用 OCR）
+              强制使用视觉识别（忽略 PDF 文本层，所有页面都用 OCR）
             </label>
             <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '5px', marginLeft: '24px' }}>
-              ⚠️ 开启后处理速度较慢，但可以看到 GLM 真实识别效果
+              ⚠️ 开启后处理速度较慢，但可以看到视觉模型真实识别效果
             </div>
           </div>
 
