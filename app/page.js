@@ -10,8 +10,8 @@ export default function Home() {
   const [over, setOver] = useState(false);
   const [analysisInput, setAnalysisInput] = useState(null); // 改：保存发送给AI的完整输入
   const [showAnalysisInput, setShowAnalysisInput] = useState(false);
-  const [forceOCR, setForceOCR] = useState(false); // 强制使用 GLM OCR
-  const [visionModel, setVisionModel] = useState('glm'); // 视觉模型选择：glm 或 qwen
+  const [forceOCR, setForceOCR] = useState(false); // 强制使用视觉识别
+  const [visionModel, setVisionModel] = useState('glm-5v'); // 视觉模型选择：glm-5v 或 glm-4.6v
   const inputRef = useRef();
 
   useEffect(() => {
@@ -313,27 +313,27 @@ export default function Home() {
                 <input 
                   type="radio" 
                   name="visionModel"
-                  value="glm"
-                  checked={visionModel === 'glm'} 
+                  value="glm-5v"
+                  checked={visionModel === 'glm-5v'} 
                   onChange={(e) => setVisionModel(e.target.value)}
                   style={{ marginRight: '6px' }}
                 />
-                智谱 GLM-5V-Turbo（当前）
+                GLM-5V-Turbo（推荐）
               </label>
               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <input 
                   type="radio" 
                   name="visionModel"
-                  value="qwen"
-                  checked={visionModel === 'qwen'} 
+                  value="glm-4.6v"
+                  checked={visionModel === 'glm-4.6v'} 
                   onChange={(e) => setVisionModel(e.target.value)}
                   style={{ marginRight: '6px' }}
                 />
-                阿里通义千问 VL-Max（推荐）
+                GLM-4.6V
               </label>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--ink-3)', marginTop: '5px' }}>
-              💡 千问 VL-Max 对中文表格识别效果更好
+              💡 GLM-5V-Turbo 对表格识别效果更好
             </div>
           </div>
 

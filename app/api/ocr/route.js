@@ -6,7 +6,7 @@ export const maxDuration = 120;
 // 接收一页扫描图片(base64 data URL)，调用视觉大模型转写为文字。
 export async function POST(req) {
   try {
-    const { image, model = 'glm' } = await req.json(); // data:image/png;base64,xxx
+    const { image, model = 'glm-5v' } = await req.json(); // data:image/png;base64,xxx
     if (!image) return NextResponse.json({ error: '缺少图片' }, { status: 400 });
 
     // 检查图片大小（Base64 编码后的大小）
@@ -20,25 +20,15 @@ export async function POST(req) {
       }, { status: 413 });
     }
 
-    // 模型配置
-    let apiKey, modelName, baseUrl;
-    
-    if (model === 'qwen') {
-      // 阿里通义千问 VL
-      apiKey = process.env.QWEN_API_KEY;
-      modelName = 'qwen-vl-max';
-      baseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
-    } else {
-      // 智谱 GLM (默认)
-      apiKey = process.env.VISION_API_KEY;
-      modelName = 'glm-5v-turbo';
-      baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
-    }
+    // 智谱 GLM 模型配置
+    const apiKey = process.env.VISION_API_KEY;
+    const modelName = model === 'glm-4.6v' ? 'glm-4v-0520' : 'glm-5v-turbo';
+    const baseUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
     
     if (!apiKey) {
-      console.error(`[OCR] 环境变量未配置: ${model === 'qwen' ? 'QWEN_API_KEY' : 'VISION_API_KEY'}`);
+      console.error('[OCR] 环境变量 VISION_API_KEY 未配置');
       return NextResponse.json({ 
-        error: `服务器配置错误：未配置 ${model === 'qwen' ? 'QWEN_API_KEY' : 'VISION_API_KEY'}` 
+        error: '服务器配置错误：未配置 VISION_API_KEY' 
       }, { status: 500 });
     }
 
